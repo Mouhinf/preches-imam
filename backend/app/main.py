@@ -25,7 +25,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-STORAGE_DIR = BASE_DIR / "storage"
+try:
+    STORAGE_DIR = BASE_DIR / "storage"
+    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    STORAGE_DIR = Path(os.environ.get("XDG_CACHE_HOME", "/tmp")) / "preches-imam-storage"
+    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 AUDIO_DIR = STORAGE_DIR / "audio"
 PDF_DIR = STORAGE_DIR / "pdf"
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)

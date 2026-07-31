@@ -1,9 +1,10 @@
 """Database configuration with SQLAlchemy.
 
 Uses PostgreSQL (via DATABASE_URL env var) on Vercel,
-falls back to SQLite for local development.
+falls back to SQLite in a writable directory for local development.
 """
 import os
+import tempfile
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -16,9 +17,14 @@ if DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     engine = create_engine(DATABASE_URL)
 else:
-    BASE_DIR = Path(__file__).resolve().parent.parent
-    DB_PATH = BASE_DIR / "storage" / "preches.db"
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        BASE_DIR = Path(__file__).resolve().parent.parent
+        DB_PATH = BASE_DIR / "storage" / "preches.db"
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        DB_PATH = Path(tempfile.gettempdir()) / "preches-imam" / "preches.db"
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
     engine = create_engine(
         f"sqlite:///{DB_PATH}",
         connect_args={"check_same_thread": False},
