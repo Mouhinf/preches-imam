@@ -21,11 +21,11 @@ from .translate import _fetch_json, _mark_openrouter_down, _openrouter_available
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "google/gemma-4-31b-it:free"
+DEFAULT_MODEL = "google/gemma-4-26b-a4b-it:free"
 FREE_FALLBACK_MODELS = [
     "openai/gpt-oss-20b:free",
     "nvidia/nemotron-3-super-120b-a12b:free",
-    "poolside/laguna-s-2.1:free",
+    "inclusionai/ling-3.0-flash:free",
 ]
 
 # Budgets to stay inside Vercel's 60s maxDuration (transcription ~10-15s)
@@ -193,8 +193,11 @@ def _chat_completion(model: str, text: str) -> str:
     )
     if data.get("error"):
         raise RuntimeError(f"OpenRouter error: {data['error']}")
-    html = data["choices"][0]["message"]["content"].strip()
-    return _strip_code_fence(html)
+    msg = data["choices"][0]["message"]
+    content = msg.get("content")
+    if not content or not content.strip():
+        raise RuntimeError("Empty content from model")
+    return _strip_code_fence(content.strip())
 
 
 def _strip_code_fence(html: str) -> str:
