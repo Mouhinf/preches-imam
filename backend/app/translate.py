@@ -24,20 +24,71 @@ FETCH_TIMEOUT = 15
 DEADLINE_SECONDS = 50
 
 
-def _fetch_json(url: str, data=None, headers=None, timeout: int = FETCH_TIMEOUT) -> dict:
-    req = urllib.request.Request(url, data=data, headers=headers or {})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+def _fetch_json(url: str, data=None, headers=None, timeout: int = FETCH_TIMEOUT, retries: int = 2) -> dict:
+    """Fetch JSON with retry on HTTP 429 (OpenRouter free-tier rate limits)."""
+    last_error: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            req = urllib.request.Request(url, data=data, headers=headers or {})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < retries:
+                wait = 2 * (attempt + 1)
+                logger.warning(f"HTTP 429 (rate limit), retrying in {wait}s ({attempt + 1}/{retries})")
+                time.sleep(wait)
+                continue
+            raise
+        except Exception as e:
+            last_error = e
+            if attempt < retries:
+                wait = 2 * (attempt + 1)
+                logger.warning(f"Request failed ({e}), retrying in {wait}s ({attempt + 1}/{retries})")
+                time.sleep(wait)
+                continue
+            raise
+    raise last_error or RuntimeError("fetch failed")
+
+
+DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
+FREE_FALLBACK_MODELS = [
+    "google/gemma-4-31b-it:free",
+    "openai/gpt-oss-20b:free",
+    "poolside/laguna-s-2.1:free",
+]
+
+# Circuit breaker: after repeated 429s, stop calling OpenRouter for a while
+# (free models get saturated; MyMemory/heuristic fallbacks are instant).
+_OPENROUTER_DOWN_UNTIL = 0.0
+_OPENROUTER_COOLDOWN_SECONDS = 300
+
+
+def _openrouter_available() -> bool:
+    return time.time() >= _OPENROUTER_DOWN_UNTIL
+
+
+def _mark_openrouter_down():
+    global _OPENROUTER_DOWN_UNTIL
+    _OPENROUTER_DOWN_UNTIL = time.time() + _OPENROUTER_COOLDOWN_SECONDS
+    logger.warning("OpenRouter rate-limited (429); pausing LLM calls for %ss",
+                   _OPENROUTER_COOLDOWN_SECONDS)
 
 
 def _translate_text(text: str, target: str, source: str = "ar") -> str:
     if not text or not text.strip():
         return ""
-    if os.environ.get("OPENROUTER_API_KEY"):
-        try:
-            return _translate_openrouter(text, target, source)
-        except Exception as e:
-            logger.warning(f"OpenRouter translation failed, falling back to MyMemory: {e}")
+    if os.environ.get("OPENROUTER_API_KEY") and _openrouter_available():
+        models = [os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)] + FREE_FALLBACK_MODELS
+        for model in models:
+            try:
+                return _translate_openrouter(text, target, source, model)
+            except urllib.error.HTTPError as e:
+                if e.code == 429:
+                    _mark_openrouter_down()
+                    break
+                logger.warning(f"OpenRouter {model} failed, trying next: {e}")
+            except Exception as e:
+                logger.warning(f"OpenRouter {model} failed, trying next: {e}")
     return _translate_mymemory(text, target, source)
 
 
@@ -63,12 +114,12 @@ def _translate_mymemory(text: str, target: str, source: str = "ar") -> str:
     return translated
 
 
-def _translate_openrouter(text: str, target: str, source: str = "ar") -> str:
+def _translate_openrouter(text: str, target: str, source: str = "ar", model: str = DEFAULT_MODEL) -> str:
     lang_name = {"fr": "français", "en": "anglais"}.get(target, target)
     src_name = {"ar": "arabe"}.get(source, source)
 
     payload = json.dumps({
-        "model": "mistralai/mistral-7b-instruct:free",
+        "model": model,
         "messages": [
             {
                 "role": "system",
@@ -90,7 +141,8 @@ def _translate_openrouter(text: str, target: str, source: str = "ar") -> str:
             "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
             "Content-Type": "application/json",
         },
-        timeout=20,
+        timeout=30,
+        retries=0,
     )
     if data.get("error"):
         raise RuntimeError(f"OpenRouter error: {data['error']}")

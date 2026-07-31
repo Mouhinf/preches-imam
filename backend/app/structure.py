@@ -10,16 +10,28 @@ import json
 import logging
 import os
 import re
+import time
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from bs4 import BeautifulSoup
 
-from .translate import _fetch_json
+from .translate import _fetch_json, _mark_openrouter_down, _openrouter_available
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "deepseek/deepseek-chat"
+DEFAULT_MODEL = "google/gemma-4-31b-it:free"
+FREE_FALLBACK_MODELS = [
+    "openai/gpt-oss-20b:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "poolside/laguna-s-2.1:free",
+]
+
+# Budgets to stay inside Vercel's 60s maxDuration (transcription ~10-15s)
+STRUCTURE_BUDGET_SECONDS = int(os.environ.get("STRUCTURE_BUDGET_SECONDS", "20"))
+CHUNK_CHARS = 800
+MAX_WORKERS = 3
 
 # Colors used in markup (also referenced by frontend styles)
 QURAN_COLOR = "#0e7c5a"   # deep green
@@ -46,27 +58,113 @@ Règles strictes :
 def structure_html(text: str, language: str = "ar") -> str:
     """Return presentable HTML for a raw transcript.
 
-    Falls back to heuristic formatting when no OpenRouter key is set or the
-    LLM call fails.
+    Uses an OpenRouter LLM (with per-chunk parallelism and a global time
+    budget) when a key is set, otherwise a heuristic formatter.
     """
     if not text or not text.strip():
         return ""
 
-    if os.environ.get("OPENROUTER_API_KEY"):
+    if os.environ.get("OPENROUTER_API_KEY") and _openrouter_available():
         try:
-            html = _structure_with_llm(text, language)
+            html = _structure_llm_bounded(text, language)
             if _validate_html(html):
                 return html
             logger.warning("LLM returned invalid HTML, using fallback")
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                _mark_openrouter_down()
         except Exception as e:
             logger.warning(f"LLM structuring failed, using fallback: {e}")
 
     return _structure_heuristic(text, language)
 
 
-def _structure_with_llm(text: str, language: str) -> str:
-    model = os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)
+def _structure_llm_bounded(text: str, language: str) -> str:
+    """Structure text by LLM in parallel chunks within a time budget."""
+    chunks = _chunk_text(text, CHUNK_CHARS)
 
+    if len(chunks) == 1:
+        return _structure_with_llm(chunks[0], language)
+
+    results: dict[int, str] = {}
+    failures: list[str] = []
+
+    executor = ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(chunks)))
+    futures = {
+        executor.submit(_structure_with_llm, chunk, language): i
+        for i, chunk in enumerate(chunks)
+    }
+    try:
+        for future in as_completed(futures, timeout=STRUCTURE_BUDGET_SECONDS):
+            index = futures[future]
+            try:
+                results[index] = future.result()
+            except Exception as e:
+                failures.append(str(e))
+    except TimeoutError:
+        logger.warning(f"Structuration dépassée ({STRUCTURE_BUDGET_SECONDS}s), chunks traités: {len(results)}/{len(chunks)}")
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+    if not results and failures:
+        raise RuntimeError(f"Tous les segments ont échoué : {'; '.join(failures[:2])}")
+
+    # Fall back to heuristic formatting for chunks the LLM failed to process
+    ordered = []
+    for i, chunk in enumerate(chunks):
+        if i in results:
+            ordered.append(results[i])
+        else:
+            ordered.append(_structure_heuristic(chunk, language))
+    return "".join(ordered)
+
+
+def _chunk_text(text: str, max_chars: int) -> list[str]:
+    """Split long transcripts into balanced chunks at paragraph-like breaks."""
+    if len(text) <= max_chars:
+        return [text]
+    # prefer splitting at common oral section markers
+    markers = ["\n", "اللهم", "عباد الله", "أيها المسلمون", "أما بعد", "وصلى الله"]
+    parts: list[str] = []
+    remaining = text
+    while len(remaining) > max_chars:
+        head, tail = remaining[:max_chars], remaining[max_chars:]
+        split_at = -1
+        for marker in markers:
+            if not marker or marker == "\n":
+                continue
+            pos = head.rfind(marker)
+            if pos > max_chars // 2:
+                split_at = pos
+                break
+        if split_at == -1:
+            # fall back to sentence/word boundary
+            pos = max(head.rfind("."), head.rfind("؟"), head.rfind("،"))
+            if pos > max_chars // 2:
+                split_at = pos
+        if split_at == -1:
+            split_at = max_chars
+        split_at += 1
+        parts.append(head[:split_at].strip())
+        remaining = (head[split_at:] + tail).strip()
+    if remaining:
+        parts.append(remaining)
+    return [p for p in parts if p]
+
+
+def _structure_with_llm(text: str, language: str) -> str:
+    models = [os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)] + FREE_FALLBACK_MODELS
+    last_error: Exception | None = None
+    for model in models:
+        try:
+            return _chat_completion(model, text)
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Model {model} failed ({e}), trying next")
+    raise last_error or RuntimeError("no model available")
+
+
+def _chat_completion(model: str, text: str) -> str:
     payload = json.dumps({
         "model": model,
         "messages": [
@@ -80,7 +178,7 @@ def _structure_with_llm(text: str, language: str) -> str:
             },
         ],
         "temperature": 0.2,
-        "max_tokens": 8000,
+        "max_tokens": 4000,
     }).encode("utf-8")
 
     data = _fetch_json(
@@ -90,7 +188,8 @@ def _structure_with_llm(text: str, language: str) -> str:
             "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
             "Content-Type": "application/json",
         },
-        timeout=90,
+        timeout=20,
+        retries=0,
     )
     if data.get("error"):
         raise RuntimeError(f"OpenRouter error: {data['error']}")

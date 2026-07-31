@@ -401,6 +401,29 @@ export default function PrechePage({ params }: { params: { id: string } }) {
             >
               &ldquo;&rdquo;
             </ToolbarButton>
+            <span className="sep" />
+            <ToolbarButton
+              onClick={() => editor.chain().focus().unsetColor().run()}
+              active={!editor.isActive("textStyle", { color: "#0e7c5a" }) && !editor.isActive("textStyle", { color: "#1d4ed8" })}
+              title="Couleur par défaut"
+            >
+              <span style={{ borderBottom: "2px solid #374151", paddingBottom: 1 }}>A</span>
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setColor("#0e7c5a").run()}
+              active={editor.isActive("textStyle", { color: "#0e7c5a" })}
+              title="Vert (verset coranique)"
+            >
+              <span style={{ color: "#0e7c5a" }}>A</span>
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setColor("#1d4ed8").run()}
+              active={editor.isActive("textStyle", { color: "#1d4ed8" })}
+              title="Bleu (hadith)"
+            >
+              <span style={{ color: "#1d4ed8" }}>A</span>
+            </ToolbarButton>
+            <span className="sep" />
             <ToolbarButton
               onClick={() => editor.chain().focus().undo().run()}
               title="Annuler"
