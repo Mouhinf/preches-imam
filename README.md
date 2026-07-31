@@ -18,11 +18,12 @@ preches-imam/
 │       ├── translate.py     # Google Translate (AR→FR/EN)
 │       └── pdf_generator.py # PDF stylisé (ReportLab)
 ├── frontend/           # Next.js 14 App Router
+│   ├── vercel.json          # Config déploiement frontend
 │   └── app/
 │       ├── page.tsx          # Bibliothèque des prêches
 │       ├── upload/page.tsx   # Upload audio
 │       └── preche/[id]/page.tsx # Éditeur WYSIWYG TipTap
-├── vercel.json         # Déploiement Vercel
+├── vercel.json         # Config déploiement backend
 └── requirements.txt    # Dépendances Python (Vercel)
 ```
 
@@ -61,12 +62,26 @@ Ouvrir http://localhost:3000
 
 ## Déploiement Vercel
 
-1. Connecter le dépôt GitHub à Vercel
-2. Ajouter les variables d'environnement dans le dashboard Vercel :
-   - `ASSEMBLYAI_API_KEY`
-   - `DATABASE_URL` (Vercel Postgres)
-   - `BLOB_READ_WRITE_TOKEN` (Vercel Blob)
-3. Déployer — le backend et le frontend sont servis depuis le même domaine
+Deux projets distincts :
+
+| Projet | URL | Dossier |
+|---|---|---|
+| Frontend (Next.js) | https://preches-imam.vercel.app | `frontend/` |
+| Backend (FastAPI) | https://preches-imam-api.vercel.app | racine (`api/` + `backend/`) |
+
+Variables d'environnement à configurer :
+- **Frontend** : `NEXT_PUBLIC_API_URL=https://preches-imam-api.vercel.app`
+- **Backend** : `ASSEMBLYAI_API_KEY`, `DATABASE_URL` (optionnel), `BLOB_READ_WRITE_TOKEN` (optionnel)
+
+```bash
+# Déployer le frontend
+cd frontend
+vercel --prod
+
+# Déployer le backend
+cd ..
+vercel --prod
+```
 
 ## Utilisation
 
