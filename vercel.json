@@ -1,11 +1,10 @@
 {
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/.next",
-  "installCommand": "cd frontend && npm install",
+  "installCommand": "pip install --break-system-packages -r requirements.txt && cd frontend && npm install",
   "functions": {
     "api/**/*.py": {
-      "maxDuration": 60,
-      "memory": 1024
+      "maxDuration": 60
     }
   },
   "rewrites": [
