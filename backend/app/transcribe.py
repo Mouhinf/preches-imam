@@ -30,21 +30,3 @@ def transcribe_audio(audio_path: Path) -> str:
         raise RuntimeError(f"AssemblyAI error: {transcript.error}")
 
     return transcript.text.strip()
-
-
-def text_to_html(text: str) -> str:
-    """Convert raw transcribed text into TipTap-compatible HTML paragraphs."""
-    if not text:
-        return ""
-    paragraphs = [p.strip() for p in text.replace("\r", "").split("\n") if p.strip()]
-    if not paragraphs:
-        paragraphs = [text]
-    return "".join(f"<p>{_escape(p)}</p>" for p in paragraphs)
-
-
-def _escape(s: str) -> str:
-    return (
-        s.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )

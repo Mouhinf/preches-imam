@@ -17,7 +17,8 @@ from sqlalchemy.orm import Session
 
 from . import models, schemas
 from .database import engine, get_db, init_db, SessionLocal
-from .transcribe import transcribe_audio, text_to_html
+from .transcribe import transcribe_audio
+from .structure import structure_html
 from .translate import translate_html
 from .pdf_generator import generate_pdf
 
@@ -108,7 +109,7 @@ def _run_transcription(preche_id: int, audio_path: str):
         db.commit()
         try:
             text = transcribe_audio(Path(audio_path))
-            preche.text_ar = text_to_html(text)
+            preche.text_ar = structure_html(text, language="ar")
             preche.status = "transcribed"
             preche.error_message = None
         except Exception as e:

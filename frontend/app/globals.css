@@ -414,10 +414,12 @@ a {
 .editor-content .ProseMirror h3 { font-size: 1.1rem; color: var(--secondary); margin: 0.85rem 0 0.4rem; }
 .editor-content .ProseMirror blockquote {
   border-left: 3px solid var(--secondary);
-  padding-left: 1rem;
+  padding: 0.6rem 1rem;
   margin: 1rem 0;
   color: var(--muted);
   font-style: italic;
+  background: rgba(181, 140, 58, 0.06);
+  border-radius: 0 6px 6px 0;
 }
 .editor-content .ProseMirror ul, .editor-content .ProseMirror ol {
   padding-left: 1.5rem;
@@ -442,8 +444,9 @@ a {
 .editor-rtl .ProseMirror blockquote {
   border-left: none;
   border-right: 3px solid var(--secondary);
-  padding-left: 0;
+  padding-left: 1rem;
   padding-right: 1rem;
+  border-radius: 6px 0 0 6px;
 }
 .editor-rtl .ProseMirror ul,
 .editor-rtl .ProseMirror ol {

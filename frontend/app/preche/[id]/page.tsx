@@ -7,6 +7,8 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
+import TextStyle from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
 import Placeholder from "@tiptap/extension-placeholder";
 import { getPreche, updatePreche, translatePreche, pdfUrl, transcribePreche, type Preche } from "@/lib/api";
 
@@ -102,6 +104,8 @@ export default function PrechePage({ params }: { params: { id: string } }) {
     extensions: [
       StarterKit,
       Underline,
+      TextStyle,
+      Color,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
     ],
     content: preche ? getContent(activeTab) : "",
