@@ -4,5 +4,8 @@
     "api/**/*.py": {
       "maxDuration": 60
     }
-  }
+  },
+  "redirects": [
+    { "source": "/", "destination": "https://preches-imam-frontend.vercel.app", "permanent": false }
+  ]
 }

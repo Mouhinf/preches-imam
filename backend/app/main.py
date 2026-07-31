@@ -152,6 +152,15 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/")
+def root():
+    return {
+        "name": "Prêches de l'Imam API",
+        "frontend": "https://preches-imam-frontend.vercel.app",
+        "docs": "/docs",
+    }
+
+
 @app.get("/api/preches", response_model=List[schemas.PrecheListItem])
 def list_preches(db: Session = Depends(get_db)):
     return db.query(models.Preche).order_by(models.Preche.created_at.desc()).all()
