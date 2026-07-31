@@ -1,0 +1,5 @@
+backend/venv
+backend/storage
+backend/ffmpeg_bin
+frontend/.next
+frontend/node_modules
