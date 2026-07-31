@@ -1,11 +1,10 @@
 {
   "installCommand": "pip install --break-system-packages -r requirements.txt && cd frontend && npm install",
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend/.next",
   "functions": {
     "api/**/*.py": {
       "maxDuration": 60
     }
-  },
-  "redirects": [
-    { "source": "/", "destination": "https://preches-imam-frontend.vercel.app", "permanent": false }
-  ]
+  }
 }
