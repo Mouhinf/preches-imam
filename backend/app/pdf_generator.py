@@ -58,12 +58,12 @@ def _register_fonts():
         Path("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
     ]
     candidates_latin = [
-        FONTS_DIR / "Inter-Regular.ttf",
+        FONTS_DIR / "DejaVuSans.ttf",
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
         Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
     ]
     candidates_latin_bold = [
-        FONTS_DIR / "Inter-Bold.ttf",
+        FONTS_DIR / "DejaVuSans-Bold.ttf",
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
         Path("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
     ]

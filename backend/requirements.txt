@@ -4,7 +4,6 @@ python-multipart==0.0.12
 sqlalchemy==2.0.35
 pydantic==2.9.2
 assemblyai==0.64.32
-googletrans==4.0.2
 reportlab==4.2.5
 arabic-reshaper==3.0.0
 python-bidi==0.6.0
